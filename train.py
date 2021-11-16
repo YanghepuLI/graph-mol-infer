@@ -1,6 +1,11 @@
 import torch
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if torch.cuda.is_available():
+    print('Using CUDA')
+    device = 'cuda'
+else:
+    print('Using CPU')
+    device = 'cpu'
 
 '''
 ================================================================================
@@ -41,6 +46,8 @@ from torch_geometric.loader import DataLoader
 # Config
 targets = [1, 3, 7, 11]
 test_size = 1000
+batch_size = 2048
+random_seed = 42
 
 print('-----------------')
 print('Loading dataset.')
@@ -50,10 +57,10 @@ train_size = len(dataset) - test_size
 train_set, test_set = torch.utils.data.random_split(
     dataset=dataset,
     lengths=[train_size, test_size],
-    generator=torch.Generator().manual_seed(42)
+    generator=torch.Generator().manual_seed(random_seed)
 )
-train_loader = DataLoader(train_set, batch_size=2048, shuffle=True)
-test_loader = DataLoader(test_set, batch_size=test_size, shuffle=False)
+train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+test_loader = DataLoader(test_set, batch_size=test_size)
 
 num_node_features = dataset.data.x.shape[1]
 num_classes = len(targets)
@@ -90,11 +97,11 @@ print(model)
 Do training
 ================================================================================
 '''
-import torch.nn.functional as F
 from sklearn.metrics import r2_score
 
 # Config
 num_epochs = 50
+loss_func = torch.nn.functional.mse_loss
 
 print('-----------------')
 print('Start training...')
@@ -107,7 +114,7 @@ for epoch in range(num_epochs):
         batch = batch.to(device)
         optimizer.zero_grad()
         out = model(batch)
-        loss = F.mse_loss(out, batch.y)
+        loss = loss_func(out, batch.y)
         loss.backward()
         optimizer.step()
         sum_loss += loss.item()
