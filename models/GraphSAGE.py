@@ -1,6 +1,5 @@
 import torch
-from torch_geometric.nn import MessagePassing, SAGEConv, global_add_pool
-from torch_geometric.utils import add_self_loops, degree
+from torch_geometric.nn import SAGEConv, global_add_pool
 import torch.nn.functional as F
 
 
