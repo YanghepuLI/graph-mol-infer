@@ -135,4 +135,5 @@ for epoch in range(num_epochs):
 Save checkpoint
 ================================================================================
 '''
-torch.save(model.state_dict(), 'checkpoints/weights.pt')
+# Not now!
+#torch.save(model.state_dict(), 'checkpoints/weights.pt')
