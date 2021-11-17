@@ -64,6 +64,7 @@ y_mean = dataset.data.y.mean(dim=0)
 y_std = dataset.data.y.std(dim=0)
 dataset.data.y -= y_mean
 dataset.data.y /= y_std
+#dataset.data.y *= 10
 
 train_size = len(dataset) - test_size
 train_set, test_set = torch.utils.data.random_split(
@@ -88,15 +89,16 @@ Also, set proper parameters for your optimizer
 '''
 from models.GraphSAGE import GraphSAGE
 from torch_geometric.nn import DimeNet
+from torch.optim import lr_scheduler
 
 print('-----------------')
 print('Building model.')
 
 '''
 model = DimeNet(
-    hidden_channels=5,
+    hidden_channels=64,
     out_channels=num_classes,
-    num_blocks=5,
+    num_blocks=7,
     num_bilinear=5,
     num_spherical=5,
     num_radial=5
@@ -105,13 +107,14 @@ model = DimeNet(
 
 model = GraphSAGE(
     in_channels=num_node_features,
-    embedding_size=16,
-    hiddens=[64, 64],
+    hidden_channels=64,
+    num_layers=6,
     out_channels=num_classes
 )
 
 model.to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.1, weight_decay=5e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)
+scheduler = lr_scheduler.StepLR(optimizer, step_size=10, gamma = 0.8)
 
 print('Done.')
 print(model)
@@ -125,10 +128,12 @@ Do training
 from sklearn.metrics import r2_score
 
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import figure
 plt.ion()
+figure(figsize=(28, 6), dpi=80)
 
 # Config
-num_epochs = 50
+num_epochs = 100
 
 print('-----------------')
 print('Start training...')
@@ -144,6 +149,7 @@ for epoch in range(num_epochs):
         loss = F.mse_loss(out, batch.y)
         loss.backward()
         optimizer.step()
+        scheduler.step()
         sum_loss += loss.item()
     avg_loss = sum_loss / len(train_loader) / num_classes
 
