@@ -23,12 +23,14 @@ class GraphSAGE(torch.nn.Module):
             the dropout rate, default is None
 
     '''
-    def __init__(self, in_channels, hiddens, out_channels, dropout=None):
+    def __init__(self, in_channels, embedding_size, hiddens, out_channels, dropout=None):
         super(GraphSAGE, self).__init__()
+
+        self.embedding_layer = torch.nn.Linear(in_channels, embedding_size)
 
         self.convs = torch.nn.ModuleList()
         if len(hiddens) != 0:
-            self.convs.append(SAGEConv(in_channels, hiddens[0]))
+            self.convs.append(SAGEConv(embedding_size, hiddens[0]))
             for i in range(len(hiddens)-1):
                 self.convs.append(SAGEConv(hiddens[i], hiddens[i+1]))
             self.convs.append(SAGEConv(hiddens[-1], out_channels))
@@ -42,6 +44,8 @@ class GraphSAGE(torch.nn.Module):
 
     def forward(self, data):
         x, edge_index, batch = data.x, data.edge_index, data.batch
+
+        x = self.embedding_layer(x)
 
         for i in range(len(self.convs)-1):
             x = self.convs[i](x, edge_index)

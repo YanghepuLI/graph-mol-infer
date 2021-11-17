@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 if torch.cuda.is_available():
@@ -42,6 +43,7 @@ https://arxiv.org/pdf/2107.02381.pdf
 '''
 from torch_geometric.datasets import QM9
 from torch_geometric.loader import DataLoader
+import torch.nn.functional as F
 
 # Config
 targets = [1, 3, 7, 11]
@@ -52,7 +54,17 @@ random_seed = 42
 print('-----------------')
 print('Loading dataset.')
 
-dataset = QM9(root='./datasets/QM9/', transform=SelectTargets(targets))
+dataset = QM9(root='./datasets/QM9/')
+
+# Select targets
+dataset.data.y = dataset.data.y[:, targets]
+
+# Normalize target values
+y_mean = dataset.data.y.mean(dim=0)
+y_std = dataset.data.y.std(dim=0)
+dataset.data.y -= y_mean
+dataset.data.y /= y_std
+
 train_size = len(dataset) - test_size
 train_set, test_set = torch.utils.data.random_split(
     dataset=dataset,
@@ -63,7 +75,7 @@ train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_set, batch_size=test_size)
 
 num_node_features = dataset.data.x.shape[1]
-num_classes = len(targets)
+num_classes = dataset.data.y.shape[1]
 
 print('Done.')
 print(dataset)
@@ -75,18 +87,31 @@ Also, set proper parameters for your optimizer
 ================================================================================
 '''
 from models.GraphSAGE import GraphSAGE
+from torch_geometric.nn import DimeNet
 
 print('-----------------')
 print('Building model.')
 
+'''
+model = DimeNet(
+    hidden_channels=5,
+    out_channels=num_classes,
+    num_blocks=5,
+    num_bilinear=5,
+    num_spherical=5,
+    num_radial=5
+)
+'''
+
 model = GraphSAGE(
     in_channels=num_node_features,
+    embedding_size=16,
     hiddens=[64, 64],
-    out_channels=num_classes,
-    dropout=0.5
+    out_channels=num_classes
 )
+
 model.to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.05, weight_decay=5e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.1, weight_decay=5e-4)
 
 print('Done.')
 print(model)
@@ -99,9 +124,11 @@ Do training
 '''
 from sklearn.metrics import r2_score
 
+import matplotlib.pyplot as plt
+plt.ion()
+
 # Config
 num_epochs = 50
-loss_func = torch.nn.functional.mse_loss
 
 print('-----------------')
 print('Start training...')
@@ -114,7 +141,7 @@ for epoch in range(num_epochs):
         batch = batch.to(device)
         optimizer.zero_grad()
         out = model(batch)
-        loss = loss_func(out, batch.y)
+        loss = F.mse_loss(out, batch.y)
         loss.backward()
         optimizer.step()
         sum_loss += loss.item()
@@ -126,14 +153,30 @@ for epoch in range(num_epochs):
         out = model(batch)
         y_true = batch.y.cpu().detach().numpy()
         y_pred = out.cpu().detach().numpy()
-        r2 = r2_score(y_true, y_pred, multioutput='raw_values')
+
+    r2 = r2_score(y_true, y_pred, multioutput='raw_values')
+    mae = np.mean(np.abs(y_pred - y_true), axis=0)
+
+    plt.clf()
+    plt.subplot(1, 4, 1)
+    plt.scatter(y_true[:, 0], y_pred[:, 0])
+    plt.subplot(1, 4, 2)
+    plt.scatter(y_true[:, 1], y_pred[:, 1])
+    plt.subplot(1, 4, 3)
+    plt.scatter(y_true[:, 2], y_pred[:, 2])
+    plt.subplot(1, 4, 4)
+    plt.scatter(y_true[:, 3], y_pred[:, 3])
+    plt.pause(0.0001)
+    plt.draw()
+    plt.show(block=False)
+    plt.pause(0.0001)
 
     print('Epoch {:03d} \t Avg. train loss: {:.4f}'.format(epoch, avg_loss))
     print('-')
-    print('\t\t ALPHA R2: {:.4f}'.format(r2[0]))
-    print('\t\t LUMO  R2: {:.4f}'.format(r2[1]))
-    print('\t\t U0    R2: {:.4f}'.format(r2[2]))
-    print('\t\t CV    R2: {:.4f}'.format(r2[3]))
+    print('\t\t ALPHA R2: {:.4f} \t MAE: {:.4f}'.format(r2[0], mae[0]))
+    print('\t\t LUMO  R2: {:.4f} \t MAE: {:.4f}'.format(r2[1], mae[1]))
+    print('\t\t U0    R2: {:.4f} \t MAE: {:.4f}'.format(r2[2], mae[2]))
+    print('\t\t CV    R2: {:.4f} \t MAE: {:.4f}'.format(r2[3], mae[3]))
     print('-')
 
 
