@@ -113,8 +113,8 @@ model = GraphSAGE(
 )
 
 model.to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)
-scheduler = lr_scheduler.StepLR(optimizer, step_size=10, gamma = 0.8)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.005, weight_decay=1e-4)
+scheduler = lr_scheduler.StepLR(optimizer, step_size=10, gamma = 0.5)
 
 print('Done.')
 print(model)
@@ -149,9 +149,9 @@ for epoch in range(num_epochs):
         loss = F.mse_loss(out, batch.y)
         loss.backward()
         optimizer.step()
-        scheduler.step()
         sum_loss += loss.item()
     avg_loss = sum_loss / len(train_loader) / num_classes
+    scheduler.step()
 
     model.eval()
     for batch in test_loader:
