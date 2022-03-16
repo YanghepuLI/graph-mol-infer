@@ -1,0 +1,1 @@
+python train_GraphSAGE_split.py -sdffile /home/featurize/data/gdb9_15794_eli.sdf -nlayers 6 -hiddensize 64 -nepochs 100 -lr 0.005 -outputfile "./RESULT_15794.txt" --verbose
