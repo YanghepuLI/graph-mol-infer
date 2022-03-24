@@ -127,7 +127,6 @@ end_loop = False
 skip_this = False
 for line in molinfer_y:
     if skip_header:
-        print('target name:', line[target_idx])
         skip_header = False
         continue
     skip_this = False
@@ -165,7 +164,7 @@ print(len(indices), 'molecules remaining after filtering.')
 
 train_dataset_split = torch.utils.data.Subset(dataset, indices)
 
-test_size = int(len(train_dataset_split) * 0.8)
+test_size = int(len(train_dataset_split) * 0.2)
 train_size = len(train_dataset_split) - test_size
 train_set, test_set = torch.utils.data.random_split(
     dataset=train_dataset_split,
