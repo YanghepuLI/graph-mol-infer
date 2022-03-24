@@ -8,8 +8,10 @@ import torch
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-sdffile', type=str, required=True,
-                    help="Path to SDF file used to filter QM9.")
+# parser.add_argument('-sdffile', type=str, required=True,
+#                     help="Path to SDF file used to filter QM9.")
+parser.add_argument('-csvfile', type=str, required=True,
+                   help="Path to CSV file used to filter QM9")
 parser.add_argument('-nlayers', type=int, required=True,
                     help="the number of GNN layers.")
 parser.add_argument('-hiddensize', type=int, required=True,
@@ -64,6 +66,7 @@ class SelectTargets(BaseTransform):
 ================================================================================
 QM9 dataset
 Target #0 (MU) #2 (HOMO) #4 (GAP) are used.
+#1 (Alpha) #3 (LUMO) #7 (U0) #11 (CV)
 Please find:
 http://quantum-machine.org/datasets/
 https://pytorch-geometric.readthedocs.io/en/latest/modules/datasets.html
@@ -75,6 +78,7 @@ from torch_geometric.loader import DataLoader
 import torch.nn.functional as F
 
 # Config
+# targets = [1, 3, 7, 11]
 targets = [0, 2, 4]
 batch_size = 2048
 random_seed = 42
@@ -101,25 +105,34 @@ dataset.data.y /= y_std
 Dataset split
 ================================================================================
 '''
-mol_name_list = []
-with open(args.sdffile, 'r') as f:
-    next_line_is_name = True
-    for line in f:
-        if next_line_is_name:
-            mol_name_list.append(line.strip())
-            next_line_is_name = False
-        if line.startswith('$$$$'):
-            next_line_is_name = True
+import csv
+
+with open(args.csvfile, newline='') as csvfile:
+    molinfer_y = list(csv.reader(csvfile))
+
+# mol_name_list = []
+# with open(args.sdffile, 'r') as f:
+#     next_line_is_name = True
+#     for line in f:
+#         if next_line_is_name:
+#             mol_name_list.append(line.strip())
+#             next_line_is_name = False
+#         if line.startswith('$$$$'):
+#             next_line_is_name = True
 
 indices = []
 pointer = 0
 skip_header = True
 end_loop = False
 skip_this = False
-for name in mol_name_list:
+for line in molinfer_y:
+    if skip_header:
+        print('target name:', line[target_idx])
+        skip_header = False
+        continue
     skip_this = False
+    name = line[0]
     while dataset.data.name[pointer] != name:
-        # Molecule names have format "gdb_xxx"
         if int(dataset.data.name[pointer][4:]) > int(name[4:]):
             skip_this = True
             break
@@ -131,6 +144,22 @@ for name in mol_name_list:
         break
     if not skip_this:
         indices.append(pointer)
+
+# for name in mol_name_list:
+#     skip_this = False
+#     while dataset.data.name[pointer] != name:
+#         # Molecule names have format "gdb_xxx"
+#         if int(dataset.data.name[pointer][4:]) > int(name[4:]):
+#             skip_this = True
+#             break
+#         pointer += 1
+#         if pointer >= len(dataset.data.name):
+#             end_loop = True
+#             break
+#     if end_loop:
+#         break
+#     if not skip_this:
+#         indices.append(pointer)
 
 print(len(indices), 'molecules remaining after filtering.')
 
@@ -199,35 +228,40 @@ if args.plot:
     point_color = '#2A52BE'
 
     plt.ion()
-    fig, axs = plt.subplots(1, 4, figsize=(28, 6))
+#     fig, axs = plt.subplots(1, 4, figsize=(28, 6))
+    fig, axs = plt.subplots(1, 3, figsize=(28, 6))
+
     plt.show(block=False)
 
     def update_scatter(y_true, y_pred):
         axs[0].clear()
         axs[1].clear()
         axs[2].clear()
-        axs[3].clear()
-        axs[0].set_title('ALPHA')
+#         axs[3].clear()
+#         axs[0].set_title('ALPHA')
+        axs[0].set_title('MU')
         axs[0].set_xlabel('Ground Truth')
         axs[0].set_ylabel('Prediction')
-        axs[1].set_title('LUMO')
+#         axs[1].set_title('LUMO')
+        axs[1].set_title('HOMO')
         axs[1].set_xlabel('Ground Truth')
         axs[1].set_ylabel('Prediction')
-        axs[2].set_title('U0')
+#         axs[2].set_title('U0')
+        axs[2].set_title('GAP')
         axs[2].set_xlabel('Ground Truth')
-        axs[2].set_ylabel('Prediction')
-        axs[3].set_title('CV')
-        axs[3].set_xlabel('Ground Truth')
-        axs[3].set_ylabel('Prediction')
+#         axs[2].set_ylabel('Prediction')
+#         axs[3].set_title('CV')
+#         axs[3].set_xlabel('Ground Truth')
+#         axs[3].set_ylabel('Prediction')
         if len(y_true) != 0:
             axs[0].scatter(y_true[:, 0], y_pred[:, 0], s=point_size, c=point_color)
             axs[1].scatter(y_true[:, 1], y_pred[:, 1], s=point_size, c=point_color)
             axs[2].scatter(y_true[:, 2], y_pred[:, 2], s=point_size, c=point_color)
-            axs[3].scatter(y_true[:, 3], y_pred[:, 3], s=point_size, c=point_color)
+#             axs[3].scatter(y_true[:, 3], y_pred[:, 3], s=point_size, c=point_color)
         axs[0].set_ylim(axs[0].get_xlim())
         axs[1].set_ylim(axs[1].get_xlim())
         axs[2].set_ylim(axs[2].get_xlim())
-        axs[3].set_ylim(axs[3].get_xlim())
+#         axs[3].set_ylim(axs[3].get_xlim())
         plt.pause(0.0001)
         plt.draw()
         plt.pause(0.0001)
@@ -283,10 +317,10 @@ for epoch in range(args.nepochs):
     if args.verbose:
         print('Epoch {:03d} \t Avg. train loss: {:.4f}'.format(epoch, avg_loss))
         print('-')
-        print('\t\t ALPHA ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[0], mae[0]))
-        print('\t\t LUMO  ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[1], mae[1]))
-        print('\t\t U0    ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[2], mae[2]))
-        print('\t\t CV    ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[3], mae[3]))
+        print('\t\t MU ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[0], mae[0]))
+        print('\t\t HOMO  ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[1], mae[1]))
+        print('\t\t GAP    ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[2], mae[2]))
+#         print('\t\t CV    ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[3], mae[3]))
         print('-')
 
 
@@ -310,10 +344,10 @@ print('Num layers   :', args.nlayers)
 print('Hidden size  :', args.hiddensize)
 print('Epochs       :', args.nepochs)
 print('Learning rate:', args.lr)
-print('ALPHA ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[0], mae[0]))
-print('LUMO  ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[1], mae[1]))
-print('U0    ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[2], mae[2]))
-print('CV    ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[3], mae[3]))
+print('MU ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[0], mae[0]))
+print('HOMO  ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[1], mae[1]))
+print('GAP    ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[2], mae[2]))
+# print('CV    ADJ R2: {:.4f} \t MAE: {:.4f}'.format(adj_r2[3], mae[3]))
 print()
 
 with open(args.outputfile, "a+") as f:
@@ -322,8 +356,8 @@ with open(args.outputfile, "a+") as f:
     f.write('Hidden size  : {}\n'.format(args.hiddensize))
     f.write('Epochs       : {}\n'.format(args.nepochs))
     f.write('Learning rate: {}\n'.format(args.nepochs))
-    f.write('ALPHA ADJ R2: {:.4f} \t MAE: {:.4f}\n'.format(adj_r2[0], mae[0]))
-    f.write('LUMO  ADJ R2: {:.4f} \t MAE: {:.4f}\n'.format(adj_r2[1], mae[1]))
-    f.write('U0    ADJ R2: {:.4f} \t MAE: {:.4f}\n'.format(adj_r2[2], mae[2]))
-    f.write('CV    ADJ R2: {:.4f} \t MAE: {:.4f}\n'.format(adj_r2[3], mae[3]))
+    f.write('MU ADJ R2: {:.4f} \t MAE: {:.4f}\n'.format(adj_r2[0], mae[0]))
+    f.write('HOMO  ADJ R2: {:.4f} \t MAE: {:.4f}\n'.format(adj_r2[1], mae[1]))
+    f.write('GAP    ADJ R2: {:.4f} \t MAE: {:.4f}\n'.format(adj_r2[2], mae[2]))
+#     f.write('CV    ADJ R2: {:.4f} \t MAE: {:.4f}\n'.format(adj_r2[3], mae[3]))
     f.write('\n\n')
