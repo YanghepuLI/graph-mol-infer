@@ -63,7 +63,7 @@ class SelectTargets(BaseTransform):
 '''
 ================================================================================
 QM9 dataset
-Target #1 (ALPHA) #3 (LUMO) #7 (U0) #11 (CV) are used.
+Target #0 (MU) #2 (HOMO) #4 (GAP) are used.
 Please find:
 http://quantum-machine.org/datasets/
 https://pytorch-geometric.readthedocs.io/en/latest/modules/datasets.html
@@ -75,7 +75,7 @@ from torch_geometric.loader import DataLoader
 import torch.nn.functional as F
 
 # Config
-targets = [1, 3, 7, 11]
+targets = [0, 2, 4]
 batch_size = 2048
 random_seed = 42
 
